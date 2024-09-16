@@ -49,14 +49,16 @@ void render_options()
         Settings::json_settings[Settings::LOCK_POSITION] = Settings::lock_position;
         Settings::save(Settings::settings_path);
     }
-    ImGui::InputText("Short Name##ChatShortsShortNameInput", &short_message);
-    ImGui::InputTextMultiline("Chat Message##ChatShortsAddMessageInput", message, 200);
-    if (ImGui::Button("Add Message##AddChatShortsMessage")) {
-        chat_messages.emplace_back(short_message, message);
-        short_message.clear();
-        memset(message, 0, 199);
-        Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-        Settings::save(Settings::settings_path);
+    if (ImGui::CollapsingHeader("Add Message##ChatShortsMessagesCollapse")) {
+        ImGui::InputText("Short Name##ChatShortsShortNameInput", &short_message);
+        ImGui::InputTextMultiline("Chat Message##ChatShortsAddMessageInput", message, 200);
+        if (ImGui::Button("Add Message##AddChatShortsMessage")) {
+            chat_messages.emplace_back(short_message, message);
+            short_message.clear();
+            memset(message, 0, 199);
+            Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
+            Settings::save(Settings::settings_path);
+        }
     }
     render_messages();
     if (to_delete != -1) {
