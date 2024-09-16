@@ -9,14 +9,14 @@
 using json = nlohmann::json;
 namespace Settings
 {
-const char *IS_ADDON_ENABLED = "IsAddonEnabled";
+const char *LOCK_POSITION = "LockPosition";
 const char *CHAT_MESSAGES = "ChatMessages";
 
 json json_settings;
 std::mutex mutex;
 std::filesystem::path settings_path;
 
-bool is_addon_enabled = true;
+bool lock_position = false;
 
 void load(const std::filesystem::path &path)
 {
@@ -37,8 +37,8 @@ void load(const std::filesystem::path &path)
             api->Log(ELogLevel_WARNING, addon_name, ex.what());
         }
     }
-    if (!json_settings[IS_ADDON_ENABLED].is_null()) {
-        json_settings[IS_ADDON_ENABLED].get_to(is_addon_enabled);
+    if (!json_settings[LOCK_POSITION].is_null()) {
+        json_settings[LOCK_POSITION].get_to(lock_position);
     }
     if (!json_settings[CHAT_MESSAGES].is_null()) {
         json_settings[CHAT_MESSAGES].get_to(chat_messages);

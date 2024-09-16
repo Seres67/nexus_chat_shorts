@@ -5,7 +5,7 @@
 
 #include <imgui/misc/cpp/imgui_stdlib.h>
 std::string short_message;
-std::string message;
+char message[199];
 std::string edit_short;
 std::string edit_message;
 int to_edit = -1;
@@ -28,7 +28,7 @@ void render_messages()
                     Settings::save(Settings::settings_path);
                 }
             } else {
-                ImGui::TextWrapped("%s: %s", chat_messages[i].short_message.c_str(), chat_messages[i].message.c_str());
+                ImGui::TextWrapped("%s:\n%s", chat_messages[i].short_message.c_str(), chat_messages[i].message.c_str());
                 if (ImGui::Button("Edit")) {
                     edit_short = chat_messages[i].short_message;
                     edit_message = chat_messages[i].message;
@@ -45,16 +45,16 @@ void render_messages()
 
 void render_options()
 {
-    if (ImGui::Checkbox("Enabled##ChatShortsEnabled", &Settings::is_addon_enabled)) {
-        Settings::json_settings[Settings::IS_ADDON_ENABLED] = Settings::is_addon_enabled;
+    if (ImGui::Checkbox("Lock Position##ChatShortsLockPosition", &Settings::lock_position)) {
+        Settings::json_settings[Settings::LOCK_POSITION] = Settings::lock_position;
         Settings::save(Settings::settings_path);
     }
     ImGui::InputText("Short Name##ChatShortsShortNameInput", &short_message);
-    ImGui::InputTextMultiline("Chat Message##ChatShortsAddMessageInput", &message);
-    if (ImGui::Button("Add##AddChatShortsMessage")) {
+    ImGui::InputTextMultiline("Chat Message##ChatShortsAddMessageInput", message, 200);
+    if (ImGui::Button("Add Message##AddChatShortsMessage")) {
         chat_messages.emplace_back(short_message, message);
         short_message.clear();
-        message.clear();
+        memset(message, 0, 199);
         Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
         Settings::save(Settings::settings_path);
     }

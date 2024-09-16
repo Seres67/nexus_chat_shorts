@@ -1,13 +1,9 @@
-#include "clipboard.hpp"
-#include "nexus/Nexus.h"
-#include <cfloat>
+#include <clipboard.hpp>
 #include <globals.hpp>
 #include <gui.hpp>
 #include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
+#include <nexus/Nexus.h>
 #include <settings.hpp>
-#include <stdio.h>
-#include <winuser.h>
 
 void addon_load(AddonAPI *api_p);
 void addon_unload();
@@ -39,7 +35,7 @@ extern "C" __declspec(dllexport) AddonDefinition *GetAddonDef()
     addon_def.Version.Major = 0;
     addon_def.Version.Minor = 1;
     addon_def.Version.Build = 0;
-    addon_def.Version.Revision = 0;
+    addon_def.Version.Revision = 1;
     addon_def.Author = "Seres67";
     addon_def.Description = "An addon to store and copy/send recurring chat messages";
     addon_def.Load = addon_load;
@@ -65,9 +61,6 @@ void addon_load(AddonAPI *api_p)
     Settings::settings_path = api->Paths.GetAddonDirectory("chat_shorts\\settings.json");
     if (std::filesystem::exists(Settings::settings_path)) {
         Settings::load(Settings::settings_path);
-    } else {
-        Settings::json_settings[Settings::IS_ADDON_ENABLED] = Settings::is_addon_enabled;
-        Settings::save(Settings::settings_path);
     }
     api->Log(ELogLevel_INFO, addon_name, "addon loaded!");
 }
@@ -81,6 +74,7 @@ void addon_unload()
     api->Log(ELogLevel_INFO, addon_name, "addon unloaded!");
     api = nullptr;
 }
+
 LPARAM get_l_param(std::uint32_t key, bool down)
 {
     std::int64_t l_param;
@@ -99,71 +93,80 @@ LPARAM get_l_param(std::uint32_t key, bool down)
 
     return l_param;
 }
+
 bool tmp_open = true;
 void addon_render()
 {
     ImGui::SetNextWindowPos(ImVec2(300, 400), ImGuiCond_FirstUseEver);
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
+    if (Settings::lock_position) {
+        flags |= ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    }
     if (tmp_open && ImGui::Begin("Chat Shorts##ChatShortsMainWindow", &tmp_open, flags)) {
-        for (const auto &[short_message, message] : chat_messages) {
-            ImGui::PushID(short_message.c_str());
-            ImGui::Text("%s", short_message.c_str());
-            if (ImGui::IsItemHovered()) {
-                auto size = ImGui::CalcTextSize(message.c_str(), nullptr, false, 500);
-                size.x += 20;
-                ImGui::SetNextWindowSize({size.x, -FLT_MIN});
-                ImGui::BeginTooltip();
-                ImGui::TextWrapped("%s", message.c_str());
-                ImGui::EndTooltip();
+        if (ImGui::BeginTable("Messages##", 3)) {
+            for (const auto &[short_message, message] : chat_messages) {
+                ImGui::TableNextRow();
+                ImGui::PushID(short_message.c_str());
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%s", short_message.c_str());
+                if (ImGui::IsItemHovered()) {
+                    auto size = ImGui::CalcTextSize(message.c_str(), nullptr, false, 500);
+                    size.x += 20;
+                    ImGui::SetNextWindowSize({size.x, -FLT_MIN});
+                    ImGui::BeginTooltip();
+                    ImGui::TextWrapped("%s", message.c_str());
+                    ImGui::EndTooltip();
+                }
+                ImGui::TableSetColumnIndex(1);
+                if (ImGui::Button("Copy##ChatShortsCopyMessageButton")) {
+                    copy_to_clipboard(game_handle, message);
+                }
+                ImGui::TableSetColumnIndex(2);
+                if (ImGui::Button("Send##ChatShortsSendMessageButton")) {
+                    std::thread(
+                        [message]()
+                        {
+                            using namespace std::chrono_literals;
+
+                            std::optional<std::string> old = save_and_copy_to_clipboard(game_handle, message);
+
+                            SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
+                            SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
+                            std::this_thread::sleep_for(25ms);
+
+                            INPUT select_text[1] = {};
+                            ZeroMemory(select_text, sizeof(select_text));
+                            select_text[0].type = INPUT_KEYBOARD;
+                            select_text[0].ki.wVk = VK_CONTROL;
+                            UINT u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
+                            if (u_sent != ARRAYSIZE(select_text)) {
+                                api->Log(ELogLevel_DEBUG, addon_name, "SendInput failed");
+                            }
+                            SendMessage(game_handle, WM_KEYDOWN, 'V', get_l_param('V', true));
+                            SendMessage(game_handle, WM_KEYUP, 'V', get_l_param('V', false));
+                            std::this_thread::sleep_for(25ms);
+
+                            ZeroMemory(select_text, sizeof(select_text));
+                            select_text[0].type = INPUT_KEYBOARD;
+                            select_text[0].ki.wVk = VK_CONTROL;
+                            select_text[0].ki.dwFlags = KEYEVENTF_KEYUP;
+                            u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
+                            if (u_sent != ARRAYSIZE(select_text)) {
+                                api->Log(ELogLevel_DEBUG, addon_name, "SendInput failed");
+                            }
+                            std::this_thread::sleep_for(25ms);
+
+                            SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
+                            SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
+                            std::this_thread::sleep_for(25ms);
+                            if (old.has_value())
+                                copy_to_clipboard(game_handle, old.value());
+                        })
+                        .detach();
+                }
+                ImGui::PopID();
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Copy##ChatShortsCopyMessageButton")) {
-                copy_to_clipboard(game_handle, message);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Send##ChatShortsSendMessageButton")) {
-                std::thread(
-                    [message]()
-                    {
-                        using namespace std::chrono_literals;
-
-                        std::optional<std::string> old = save_and_copy_to_clipboard(game_handle, message);
-
-                        SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
-                        SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                        std::this_thread::sleep_for(25ms);
-
-                        INPUT select_text[1] = {};
-                        ZeroMemory(select_text, sizeof(select_text));
-                        select_text[0].type = INPUT_KEYBOARD;
-                        select_text[0].ki.wVk = VK_CONTROL;
-                        UINT u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
-                        if (u_sent != ARRAYSIZE(select_text)) {
-                            api->Log(ELogLevel_DEBUG, addon_name, "SendInput failed");
-                        }
-                        SendMessage(game_handle, WM_KEYDOWN, 'V', get_l_param('V', true));
-                        SendMessage(game_handle, WM_KEYUP, 'V', get_l_param('V', false));
-                        std::this_thread::sleep_for(25ms);
-
-                        ZeroMemory(select_text, sizeof(select_text));
-                        select_text[0].type = INPUT_KEYBOARD;
-                        select_text[0].ki.wVk = VK_CONTROL;
-                        select_text[0].ki.dwFlags = KEYEVENTF_KEYUP;
-                        u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
-                        if (u_sent != ARRAYSIZE(select_text)) {
-                            api->Log(ELogLevel_DEBUG, addon_name, "SendInput failed");
-                        }
-                        std::this_thread::sleep_for(25ms);
-
-                        SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
-                        SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                        std::this_thread::sleep_for(25ms);
-                        if (old.has_value())
-                            copy_to_clipboard(game_handle, old.value());
-                    })
-                    .detach();
-            }
-            ImGui::PopID();
+            ImGui::EndTable();
         }
         ImGui::End();
     }

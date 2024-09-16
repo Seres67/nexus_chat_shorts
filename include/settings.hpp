@@ -14,9 +14,9 @@ extern nlohmann::json json_settings;
 extern std::filesystem::path settings_path;
 extern std::mutex mutex;
 
-extern bool is_addon_enabled;
+extern bool lock_position;
 
-extern const char *IS_ADDON_ENABLED;
+extern const char *LOCK_POSITION;
 extern const char *CHAT_MESSAGES;
 } // namespace Settings
 
