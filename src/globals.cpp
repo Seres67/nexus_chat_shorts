@@ -3,9 +3,12 @@
 HMODULE self_module = nullptr;
 AddonDefinition addon_def{};
 AddonAPI *api = nullptr;
+Mumble::Data *mumble_link;
+NexusLinkData *nexus_link;
 char addon_name[] = "Chat Shorts";
 HWND game_handle = nullptr;
-std::vector<Message> chat_messages;
+std::map<int, std::vector<Message>> chat_messages;
+std::map<int, std::string> maps;
 
 void from_json(const nlohmann::json &j, Message &message)
 {

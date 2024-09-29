@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.18)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
+set(BUILD_SHARED_LIBS OFF)
+set(VCPKG_TARGET_TRIPLET "x64-windows-static")
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "Vcpkg toolchain file")
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type configuration" FORCE)
+    message(STATUS "Setting default build type: ${CMAKE_BUILD_TYPE}")
+endif ()
 if (UNIX)
     set(CMAKE_SYSTEM_NAME Windows)
     set(TOOLCHAIN_PREFIX x86_64-w64-mingw32)
@@ -31,8 +39,10 @@ include_directories(include)
 # load imgui as a cmake project
 add_subdirectory(src/imgui)
 
+find_package(cpr CONFIG REQUIRED)
+
 add_library(nexus_chat_shorts SHARED src/main.cpp src/globals.cpp src/gui.cpp src/settings.cpp src/clipboard.cpp)
-target_link_libraries(nexus_chat_shorts PRIVATE imgui)
+target_link_libraries(nexus_chat_shorts PRIVATE imgui cpr::cpr)
 set_property(TARGET nexus_chat_shorts PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # copy dll to game directory

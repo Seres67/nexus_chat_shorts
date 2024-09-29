@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    {
+      "name": "cpr",
+      "version>=": "1.10.5#2"
+    }
+  ],
+  "builtin-baseline": "76d153790caf0592fce8fc4484aa6db18c7d00d4"
+}

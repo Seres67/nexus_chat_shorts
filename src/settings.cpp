@@ -11,12 +11,14 @@ namespace Settings
 {
 const char *LOCK_POSITION = "LockPosition";
 const char *CHAT_MESSAGES = "ChatMessages";
+const char *VISIBILITY = "Visibility";
 
 json json_settings;
 std::mutex mutex;
 std::filesystem::path settings_path;
 
 bool lock_position = false;
+short visibility = 0;
 
 void load(const std::filesystem::path &path)
 {
@@ -41,7 +43,10 @@ void load(const std::filesystem::path &path)
         json_settings[LOCK_POSITION].get_to(lock_position);
     }
     if (!json_settings[CHAT_MESSAGES].is_null()) {
-        json_settings[CHAT_MESSAGES].get_to(chat_messages);
+        chat_messages = json_settings[CHAT_MESSAGES].get<std::map<int, std::vector<Message>>>();
+    }
+    if (!json_settings[VISIBILITY].is_null()) {
+        json_settings[VISIBILITY].get_to(visibility);
     }
     api->Log(ELogLevel_INFO, addon_name, "settings loaded!");
 }
