@@ -16,10 +16,12 @@ extern std::mutex mutex;
 
 extern bool lock_position;
 extern short visibility;
+extern int number_columns;
 
 extern const char *LOCK_POSITION;
 extern const char *CHAT_MESSAGES;
 extern const char *VISIBILITY;
+extern const char *NUMBER_COLUMNS;
 } // namespace Settings
 
 #endif // SETTINGS_HPP

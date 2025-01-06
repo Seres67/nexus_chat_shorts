@@ -36,7 +36,7 @@ extern "C" __declspec(dllexport) AddonDefinition *GetAddonDef()
     addon_def.APIVersion = NEXUS_API_VERSION;
     addon_def.Name = addon_name;
     addon_def.Version.Major = 0;
-    addon_def.Version.Minor = 2;
+    addon_def.Version.Minor = 3;
     addon_def.Version.Build = 0;
     addon_def.Version.Revision = 0;
     addon_def.Author = "Seres67";
@@ -60,9 +60,6 @@ void addon_load(AddonAPI *api_p)
 
     mumble_link = (Mumble::Data *)api->DataLink.Get("DL_MUMBLE_LINK");
     nexus_link = (NexusLinkData *)api->DataLink.Get("DL_NEXUS_LINK");
-    api->Renderer.Register(ERenderType_Render, addon_render);
-    api->Renderer.Register(ERenderType_OptionsRender, addon_options);
-    api->WndProc.Register(wnd_proc);
 
     std::thread(
         []()
@@ -72,7 +69,7 @@ void addon_load(AddonAPI *api_p)
             if (response.status_code == 200) {
                 for (auto maps_json = nlohmann::json::parse(response.text); const auto &map : maps_json) {
                     int id = map["id"].get<int>();
-                    std::string name = map["name"].get<std::string>();
+                    const std::string name = map["name"].get<std::string>();
                     maps[id] = name;
                 }
             }
@@ -83,8 +80,11 @@ void addon_load(AddonAPI *api_p)
     if (std::filesystem::exists(Settings::settings_path)) {
         Settings::load(Settings::settings_path);
     }
-    api->Events.Subscribe("EV_SEND_CHAT_SHORTS_MESSAGE", event_handler);
+    // api->Events.Subscribe("EV_SEND_CHAT_SHORTS_MESSAGE", event_handler);
 
+    api->Renderer.Register(ERenderType_Render, addon_render);
+    api->Renderer.Register(ERenderType_OptionsRender, addon_options);
+    api->WndProc.Register(wnd_proc);
     api->Log(ELogLevel_INFO, addon_name, "addon loaded!");
 }
 
@@ -95,6 +95,8 @@ void addon_unload()
     api->Renderer.Deregister(addon_options);
     api->WndProc.Deregister(wnd_proc);
     api->Log(ELogLevel_INFO, addon_name, "addon unloaded!");
+    nexus_link = nullptr;
+    mumble_link = nullptr;
     api = nullptr;
 }
 
@@ -189,16 +191,34 @@ void addon_render()
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
     if (Settings::lock_position) {
         flags |= ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+        // flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    }
+    bool content = false;
+    for (const auto &[map_id, value] : chat_messages) {
+        if ((map_id == 0 || map_id == mumble_link->Context.MapID) && !value.empty()) {
+            content = true;
+            break;
+        }
+    }
+    if (!content && Settings::lock_position) {
+        return;
     }
     if (tmp_open && display_window() && ImGui::Begin("Chat Shorts##ChatShortsMainWindow", &tmp_open, flags)) {
-        if (ImGui::BeginTable("Messages##", 3)) {
+        if (ImGui::BeginTable("Messages##ChatShortsMessagesList", Settings::number_columns)) {
+            int i = 0;
+            ImGui::TableNextRow();
             for (const auto &[map_id, value] : chat_messages) {
                 for (const auto &[short_message, message] : value) {
                     if (map_id == 0 || map_id == mumble_link->Context.MapID) {
-                        ImGui::TableNextRow();
-                        ImGui::TableNextColumn();
+                        if (i == Settings::number_columns) {
+                            ImGui::TableNextRow();
+                            i = 0;
+                        }
+                        ImGui::TableSetColumnIndex(i);
                         ImGui::PushID(short_message.c_str());
-                        ImGui::Text("%s", short_message.c_str());
+                        if (ImGui::Button(short_message.c_str())) {
+                            send_message(message);
+                        }
                         if (ImGui::IsItemHovered()) {
                             auto size = ImGui::CalcTextSize(message.c_str(), nullptr, false, 500);
                             size.x += 20;
@@ -207,27 +227,8 @@ void addon_render()
                             ImGui::TextWrapped("%s", message.c_str());
                             ImGui::EndTooltip();
                         }
-                        ImGui::TableNextColumn();
-                        std::string copy_text = "Copy";
-                        auto copy_posX = (ImGui::GetCursorPosX() + ImGui::GetColumnWidth() -
-                                          ImGui::CalcTextSize(copy_text.c_str()).x - ImGui::GetScrollX() -
-                                          2 * ImGui::GetStyle().ItemSpacing.x);
-                        if (copy_posX > ImGui::GetCursorPosX())
-                            ImGui::SetCursorPosX(copy_posX);
-                        std::string button_text = copy_text + "##ChatShortsCopyMessageButton";
-                        if (ImGui::Button(button_text.c_str()))
-                            copy_to_clipboard(game_handle, message);
-                        ImGui::TableNextColumn();
-                        std::string send_text = "Send";
-                        auto send_posX = (ImGui::GetCursorPosX() + ImGui::GetColumnWidth() -
-                                          ImGui::CalcTextSize(send_text.c_str()).x - ImGui::GetScrollX() -
-                                          2 * ImGui::GetStyle().ItemSpacing.x);
-                        if (send_posX > ImGui::GetCursorPosX())
-                            ImGui::SetCursorPosX(send_posX);
-                        std::string button_text2 = send_text + "##ChatShortsSendMessageButton";
-                        if (ImGui::Button(button_text2.c_str()))
-                            send_message(message);
                         ImGui::PopID();
+                        ++i;
                     }
                 }
             }

@@ -97,6 +97,7 @@ void render_options()
         Settings::json_settings[Settings::LOCK_POSITION] = Settings::lock_position;
         Settings::save(Settings::settings_path);
     }
+    ImGui::InputInt("Number of columns##ChatShortsNumberColumns", &Settings::number_columns);
     if (ImGui::BeginCombo("Visibility##ChatShortsVisibility",
                           visibility_options[Settings::visibility].second.c_str())) {
         for (const auto &[key, value] : visibility_options) {
