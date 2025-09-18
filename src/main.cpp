@@ -219,6 +219,13 @@ void addon_render()
                         if (ImGui::Button(short_message.c_str())) {
                             send_message(message);
                         }
+                        if (ImGui::BeginPopupContextItem()) {
+                            if (ImGui::Button(("Copy to clipboard##ChatShorts" + message).c_str())) {
+                                copy_to_clipboard(game_handle, message);
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
                         if (ImGui::IsItemHovered()) {
                             auto size = ImGui::CalcTextSize(message.c_str(), nullptr, false, 500);
                             size.x += 20;
