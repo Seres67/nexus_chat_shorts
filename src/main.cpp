@@ -1,11 +1,14 @@
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include <httplib/httplib.h>
+
 #include <clipboard.hpp>
-#include <cpr/cpr.h>
 #include <globals.hpp>
 #include <gui.hpp>
 #include <imgui/imgui.h>
 #include <mumble/Mumble.h>
 #include <nexus/Nexus.h>
 #include <settings.hpp>
+#include <string>
 
 void addon_load(AddonAPI *api_p);
 void addon_unload();
@@ -55,8 +58,8 @@ void addon_load(AddonAPI *api_p)
     api = api_p;
 
     ImGui::SetCurrentContext(static_cast<ImGuiContext *>(api->ImguiContext));
-    ImGui::SetAllocatorFunctions(static_cast<void *(*)(size_t, void *)>(api->ImguiMalloc),
-                                 static_cast<void (*)(void *, void *)>(api->ImguiFree)); // on imgui 1.80+
+    ImGui::SetAllocatorFunctions(reinterpret_cast<void *(*)(size_t, void *)>(api->ImguiMalloc),
+                                 reinterpret_cast<void (*)(void *, void *)>(api->ImguiFree)); // on imgui 1.80+
 
     mumble_link = (Mumble::Data *)api->DataLink.Get("DL_MUMBLE_LINK");
     nexus_link = (NexusLinkData *)api->DataLink.Get("DL_NEXUS_LINK");
@@ -64,10 +67,10 @@ void addon_load(AddonAPI *api_p)
     std::thread(
         []()
         {
-            cpr::Response response =
-                cpr::Get(cpr::Url{"https://api.guildwars2.com/v2/maps"}, cpr::Parameters{{"ids", "all"}});
-            if (response.status_code == 200) {
-                for (auto maps_json = nlohmann::json::parse(response.text); const auto &map : maps_json) {
+            httplib::Client cli("https://api.guildwars2.com");
+            auto response = cli.Get("/v2/maps?ids=all");
+            if (response->status == 200) {
+                for (auto maps_json = nlohmann::json::parse(response->body); const auto &map : maps_json) {
                     int id = map["id"].get<int>();
                     const std::string name = map["name"].get<std::string>();
                     maps[id] = name;
