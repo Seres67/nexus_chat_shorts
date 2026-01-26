@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
-set(BUILD_SHARED_LIBS OFF)
-
-set(OPENSSL_USE_STATIC_LIBS ON)
 
 project(nexus_chat_shorts)
 
@@ -21,8 +18,6 @@ include_directories(include)
 # load imgui as a cmake project
 add_subdirectory(src/imgui)
 
-find_package(OpenSSL REQUIRED)
-
 add_library(nexus_chat_shorts SHARED src/main.cpp src/globals.cpp src/gui.cpp src/settings.cpp src/clipboard.cpp)
-target_link_libraries(nexus_chat_shorts PRIVATE imgui ws2_32 crypt32 OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(nexus_chat_shorts PRIVATE imgui wininet)
 set_property(TARGET nexus_chat_shorts PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

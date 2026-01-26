@@ -1,7 +1,5 @@
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include <httplib/httplib.h>
-
 #include <clipboard.hpp>
+#include <format>
 #include <globals.hpp>
 #include <gui.hpp>
 #include <imgui/imgui.h>
@@ -9,6 +7,8 @@
 #include <nexus/Nexus.h>
 #include <settings.hpp>
 #include <string>
+#include <thread>
+#include <win32-http.hpp>
 
 void addon_load(AddonAPI *api_p);
 void addon_unload();
@@ -20,14 +20,14 @@ void event_handler(void *payload);
 BOOL APIENTRY dll_main(const HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lpReserved)
 {
     switch (ul_reason_for_call) {
-    case DLL_PROCESS_ATTACH:
-        self_module = hModule;
-        break;
-    case DLL_PROCESS_DETACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    default:
-        break;
+        case DLL_PROCESS_ATTACH:
+            self_module = hModule;
+            break;
+        case DLL_PROCESS_DETACH:
+        case DLL_THREAD_ATTACH:
+        case DLL_THREAD_DETACH:
+        default:
+            break;
     }
     return TRUE;
 }
@@ -67,14 +67,15 @@ void addon_load(AddonAPI *api_p)
     std::thread(
         []()
         {
-            httplib::Client cli("https://api.guildwars2.com");
-            auto response = cli.Get("/v2/maps?ids=all");
-            if (response->status == 200) {
-                for (auto maps_json = nlohmann::json::parse(response->body); const auto &map : maps_json) {
+            auto [status, body] = win32_http::get("api.guildwars2.com", "/v2/maps?ids=all", "");
+            if (status == 200) {
+                for (auto maps_json = nlohmann::json::parse(body); const auto &map : maps_json) {
                     int id = map["id"].get<int>();
                     const std::string name = map["name"].get<std::string>();
                     maps[id] = name;
                 }
+            } else {
+                api->Log(ELogLevel_WARNING, addon_name, "could not fetch API, message list won't have map names");
             }
         })
         .detach();
@@ -83,7 +84,17 @@ void addon_load(AddonAPI *api_p)
     if (std::filesystem::exists(Settings::settings_path)) {
         Settings::load(Settings::settings_path);
     }
-    // api->Events.Subscribe("EV_SEND_CHAT_SHORTS_MESSAGE", event_handler);
+
+    if (!converted) {
+        api->Log(ELogLevel_INFO, addon_name, "found unconverted messages, converting...");
+        Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
+        Settings::save(Settings::settings_path);
+    }
+
+    // for (auto &[map, messages] : chat_messages)
+    //     for (auto &message : messages)
+    //         api->Events.Subscribe(std::string("EV_CHAT_SHORTS_" + message.short_message).c_str(),
+    //                               [message](void *data) { send_message(message.message); });
 
     api->Renderer.Register(ERenderType_Render, addon_render);
     api->Renderer.Register(ERenderType_OptionsRender, addon_options);
@@ -97,88 +108,37 @@ void addon_unload()
     api->Renderer.Deregister(addon_render);
     api->Renderer.Deregister(addon_options);
     api->WndProc.Deregister(wnd_proc);
+    for (auto &[map, messages] : chat_messages) {
+        for (auto &message : messages) {
+            api->Events.Unsubscribe(std::string("EV_CHAT_SHORTS_" + message.short_message).c_str(), event_handler);
+        }
+    }
+
     api->Log(ELogLevel_INFO, addon_name, "addon unloaded!");
     nexus_link = nullptr;
     mumble_link = nullptr;
     api = nullptr;
 }
 
-LPARAM get_l_param(std::uint32_t key, bool down)
-{
-    std::int64_t l_param = !down; // transition state
-    l_param = l_param << 1;
-    l_param += !down; // previous key state
-    l_param = l_param << 1;
-    l_param += 0; // context code
-    l_param = l_param << 1;
-    l_param = l_param << 4;
-    l_param = l_param << 1;
-    l_param = l_param << 8;
-    l_param += MapVirtualKeyA(key, MAPVK_VK_TO_VSC);
-    l_param = l_param << 16;
-    l_param += 1;
-
-    return l_param;
-}
-
-void send_message(const std::string &message)
-{
-    std::thread(
-        [message]()
-        {
-            using namespace std::chrono_literals;
-            bool open_chat = false;
-            copy_to_clipboard(game_handle, message);
-            if (!mumble_link->Context.IsTextboxFocused) {
-                SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
-                SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                std::this_thread::sleep_for(25ms);
-            } else {
-                open_chat = true;
-            }
-            INPUT select_text[1] = {};
-            ZeroMemory(select_text, sizeof(select_text));
-            select_text[0].type = INPUT_KEYBOARD;
-            select_text[0].ki.wVk = VK_CONTROL;
-            UINT u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
-            assert(u_sent == ARRAYSIZE(select_text));
-            SendMessage(game_handle, WM_KEYDOWN, 'V', get_l_param('V', true));
-            SendMessage(game_handle, WM_KEYUP, 'V', get_l_param('V', false));
-            std::this_thread::sleep_for(25ms);
-            ZeroMemory(select_text, sizeof(select_text));
-            select_text[0].type = INPUT_KEYBOARD;
-            select_text[0].ki.wVk = VK_CONTROL;
-            select_text[0].ki.dwFlags = KEYEVENTF_KEYUP;
-            u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
-            assert(u_sent == ARRAYSIZE(select_text));
-            std::this_thread::sleep_for(25ms);
-            SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
-            SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-            std::this_thread::sleep_for(25ms);
-            if (open_chat) {
-                SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
-                SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                std::this_thread::sleep_for(25ms);
-            }
-        })
-        .detach();
-}
-
 bool display_window()
 {
-    if (Settings::visibility == 0)
+    if (Settings::visibility == 0) {
         return true;
+    }
     if (Settings::visibility == 1) {
-        if (nexus_link->IsGameplay)
+        if (nexus_link->IsGameplay) {
             return true;
+        }
     }
     if (Settings::visibility == 2) {
-        if (!mumble_link->Context.IsInCombat)
+        if (!mumble_link->Context.IsInCombat) {
             return true;
+        }
     }
     if (Settings::visibility == 3) {
-        if (mumble_link->Context.IsInCombat)
+        if (mumble_link->Context.IsInCombat) {
             return true;
+        }
     }
     if (Settings::visibility == 4) {
         return false;
@@ -189,12 +149,10 @@ bool display_window()
 bool tmp_open = true;
 void addon_render()
 {
-    //    ImGui::ShowDemoWindow();
     ImGui::SetNextWindowPos(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
     if (Settings::lock_position) {
         flags |= ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-        // flags |= ImGuiWindowFlags_AlwaysAutoResize;
     }
     bool content = false;
     for (const auto &[map_id, value] : chat_messages) {
@@ -206,12 +164,13 @@ void addon_render()
     if (!content && Settings::lock_position) {
         return;
     }
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     if (tmp_open && display_window() && ImGui::Begin("Chat Shorts##ChatShortsMainWindow", &tmp_open, flags)) {
         if (ImGui::BeginTable("Messages##ChatShortsMessagesList", Settings::number_columns)) {
             int i = 0;
             ImGui::TableNextRow();
             for (const auto &[map_id, value] : chat_messages) {
-                for (const auto &[short_message, message] : value) {
+                for (const auto &[short_message, message, broadcast, key] : value) {
                     if (map_id == 0 || map_id == mumble_link->Context.MapID) {
                         if (i == Settings::number_columns) {
                             ImGui::TableNextRow();
@@ -220,11 +179,16 @@ void addon_render()
                         ImGui::TableSetColumnIndex(i);
                         ImGui::PushID(short_message.c_str());
                         if (ImGui::Button(short_message.c_str())) {
-                            send_message(message);
+                            if (broadcast) {
+                                broadcast_message(converter.from_bytes(message));
+                            } else {
+                                send_message(converter.from_bytes(message));
+                            }
                         }
                         if (ImGui::BeginPopupContextItem()) {
                             if (ImGui::Button(("Copy to clipboard##ChatShorts" + message).c_str())) {
-                                copy_to_clipboard(game_handle, message);
+                                std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+                                copy_to_clipboard(game_handle, converter.from_bytes(message));
                                 ImGui::CloseCurrentPopup();
                             }
                             ImGui::EndPopup();
@@ -248,20 +212,15 @@ void addon_render()
     }
 }
 
-void addon_options() { render_options(); }
+void addon_options()
+{
+    render_options();
+}
 
 UINT wnd_proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    if (!game_handle)
+    if (!game_handle) {
         game_handle = hWnd;
+    }
     return uMsg;
-}
-
-void event_handler(void *payload)
-{
-    std::string event_name = reinterpret_cast<const char *>(payload);
-    api->Log(ELogLevel_INFO, addon_name, event_name.c_str());
-    //    auto msg = std::ranges::find(chat_messages, event_name, &Message::short_message);
-    //    if (msg != chat_messages.end())
-    //        send_message(msg->message);
 }

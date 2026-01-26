@@ -3,8 +3,8 @@
   cmake,
   clang-tools,
   bintools,
+  windows,
   openssl,
-  stdenv,
 }:
 mkShell {
   nativeBuildInputs = [
@@ -14,10 +14,7 @@ mkShell {
   ];
 
   buildInputs = [
+    windows.pthreads
     openssl
   ];
-
-  shellHook = ''
-    export CPLUS_INCLUDE_PATH="${stdenv.cc.cc}/include/c++/${stdenv.cc.cc.version}";
-  '';
 }

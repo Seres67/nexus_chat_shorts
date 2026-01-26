@@ -12,7 +12,9 @@ stdenv.mkDerivation {
     cmake
   ];
 
-  buildInputs = [openssl];
+  buildInputs = [
+    openssl
+  ];
 
   installPhase = ''
     x86_64-w64-mingw32-strip ./*.dll

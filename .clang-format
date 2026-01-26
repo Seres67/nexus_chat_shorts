@@ -1,4 +1,5 @@
 BasedOnStyle: LLVM
+AllowShortFunctionsOnASingleLine: None
 IndentWidth: 4
 BreakBeforeBraces: Custom
 BraceWrapping:
@@ -18,3 +19,5 @@ BraceWrapping:
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
 ColumnLimit: 120
+IndentCaseLabels: true
+InsertBraces: true

@@ -1,8 +1,12 @@
 #ifndef SETTINGS_HPP
 #define SETTINGS_HPP
 
+#include <Key.hpp>
 #include <mutex>
 #include <nlohmann/json.hpp>
+
+void from_json(const nlohmann::json &j, Key &key);
+void to_json(nlohmann::json &j, const Key &key);
 
 namespace Settings
 {
