@@ -1,10 +1,6 @@
 {
   description = "A Nexus addon to track currencies.";
   inputs = {
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
-      flake = false;
-    };
     flake-utils = {
       url = "github:numtide/flake-utils";
     };
