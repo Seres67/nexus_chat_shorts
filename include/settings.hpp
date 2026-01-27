@@ -2,30 +2,23 @@
 #define SETTINGS_HPP
 
 #include <Key.hpp>
-#include <mutex>
+#include <Message.hpp>
+#include <SettingsManager.hpp>
 #include <nlohmann/json.hpp>
 
-void from_json(const nlohmann::json &j, Key &key);
-void to_json(nlohmann::json &j, const Key &key);
-
-namespace Settings
+struct Settings
 {
+    bool lock_position = false;
+    short visibility = 0;
+    int number_columns = 2;
+    std::map<int, std::vector<Message>> chat_messages;
+};
 
-void load(const std::filesystem::path &path);
-void save(const std::filesystem::path &path);
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, lock_position, visibility, number_columns, chat_messages);
 
-extern nlohmann::json json_settings;
-extern std::filesystem::path settings_path;
-extern std::mutex mutex;
+extern std::unique_ptr<SettingsManager<Settings>> settings_manager;
 
-extern bool lock_position;
-extern short visibility;
-extern int number_columns;
-
-extern const char *LOCK_POSITION;
-extern const char *CHAT_MESSAGES;
-extern const char *VISIBILITY;
-extern const char *NUMBER_COLUMNS;
-} // namespace Settings
+void from_json(const nlohmann::json &j, Settings &settings);
+void to_json(nlohmann::json &j, const Settings &settings);
 
 #endif // SETTINGS_HPP

@@ -1,8 +1,8 @@
 #include <clipboard.hpp>
-#include <format>
 #include <globals.hpp>
 #include <gui.hpp>
 #include <imgui/imgui.h>
+#include <memory>
 #include <mumble/Mumble.h>
 #include <nexus/Nexus.h>
 #include <settings.hpp>
@@ -80,15 +80,11 @@ void addon_load(AddonAPI *api_p)
         })
         .detach();
 
-    Settings::settings_path = api->Paths.GetAddonDirectory("chat_shorts\\settings.json");
-    if (std::filesystem::exists(Settings::settings_path)) {
-        Settings::load(Settings::settings_path);
-    }
+    auto settings_path = api->Paths.GetAddonDirectory("chat_shorts\\settings.json");
+    settings_manager = std::make_unique<SettingsManager<Settings>>(settings_path);
 
     if (!converted) {
-        api->Log(ELogLevel_INFO, addon_name, "found unconverted messages, converting...");
-        Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-        Settings::save(Settings::settings_path);
+        settings_manager->save();
     }
 
     // for (auto &[map, messages] : chat_messages)
@@ -108,7 +104,7 @@ void addon_unload()
     api->Renderer.Deregister(addon_render);
     api->Renderer.Deregister(addon_options);
     api->WndProc.Deregister(wnd_proc);
-    for (auto &[map, messages] : chat_messages) {
+    for (auto &[map, messages] : settings_manager->get(&Settings::chat_messages)) {
         for (auto &message : messages) {
             api->Events.Unsubscribe(std::string("EV_CHAT_SHORTS_" + message.short_message).c_str(), event_handler);
         }
@@ -122,25 +118,26 @@ void addon_unload()
 
 bool display_window()
 {
-    if (Settings::visibility == 0) {
+    auto visibility = settings_manager->get(&Settings::visibility);
+    if (visibility == 0) {
         return true;
     }
-    if (Settings::visibility == 1) {
+    if (visibility == 1) {
         if (nexus_link->IsGameplay) {
             return true;
         }
     }
-    if (Settings::visibility == 2) {
+    if (visibility == 2) {
         if (!mumble_link->Context.IsInCombat) {
             return true;
         }
     }
-    if (Settings::visibility == 3) {
+    if (visibility == 3) {
         if (mumble_link->Context.IsInCombat) {
             return true;
         }
     }
-    if (Settings::visibility == 4) {
+    if (visibility == 4) {
         return false;
     }
     return false;
@@ -149,30 +146,32 @@ bool display_window()
 bool tmp_open = true;
 void addon_render()
 {
+    auto &s = settings_manager->get();
+
     ImGui::SetNextWindowPos(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
-    if (Settings::lock_position) {
+    if (s.lock_position) {
         flags |= ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
     }
     bool content = false;
-    for (const auto &[map_id, value] : chat_messages) {
+    for (const auto &[map_id, value] : settings_manager->get(&Settings::chat_messages)) {
         if ((map_id == 0 || map_id == mumble_link->Context.MapID) && !value.empty()) {
             content = true;
             break;
         }
     }
-    if (!content && Settings::lock_position) {
+    if (!content && s.lock_position) {
         return;
     }
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     if (tmp_open && display_window() && ImGui::Begin("Chat Shorts##ChatShortsMainWindow", &tmp_open, flags)) {
-        if (ImGui::BeginTable("Messages##ChatShortsMessagesList", Settings::number_columns)) {
+        if (ImGui::BeginTable("Messages##ChatShortsMessagesList", s.number_columns)) {
             int i = 0;
             ImGui::TableNextRow();
-            for (const auto &[map_id, value] : chat_messages) {
+            for (const auto &[map_id, value] : settings_manager->get(&Settings::chat_messages)) {
                 for (const auto &[short_message, message, broadcast, key] : value) {
                     if (map_id == 0 || map_id == mumble_link->Context.MapID) {
-                        if (i == Settings::number_columns) {
+                        if (i == s.number_columns) {
                             ImGui::TableNextRow();
                             i = 0;
                         }

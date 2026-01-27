@@ -6,9 +6,9 @@
 #include <nexus/Nexus.h>
 #include <settings.hpp>
 #include <thread>
+#include <windows.h>
 
 #include <imgui/misc/cpp/imgui_stdlib.h>
-#include <windows.h>
 
 std::string edit_short;
 std::string edit_message;
@@ -19,12 +19,14 @@ std::pair to_delete = {-1, -1};
 bool confirm = false;
 void render_messages()
 {
+    auto &s = settings_manager->get();
+    auto &chat_messages = s.chat_messages;
+
     if (ImGui::CollapsingHeader("Messages##ChatShortsMessagesCollapse")) {
         for (auto it = chat_messages.begin(); it != chat_messages.end(); ++it) {
             if (it->second.empty()) {
                 it = chat_messages.erase(it);
-                Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-                Settings::save(Settings::settings_path);
+                settings_manager->set(&Settings::chat_messages, chat_messages);
                 if (it == chat_messages.end()) {
                     break;
                 }
@@ -71,8 +73,7 @@ void render_messages()
                             edit_map_id = 0;
                             edit_short.clear();
                             edit_message.clear();
-                            Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-                            Settings::save(Settings::settings_path);
+                            settings_manager->set(&Settings::chat_messages, chat_messages);
                         }
                     } else {
                         ImGui::TextWrapped("%s:\n%s", short_message.c_str(), message.c_str());
@@ -206,6 +207,7 @@ void keybind_handler(const char *identifier, bool release)
 {
     std::string event_name = reinterpret_cast<const char *>(identifier);
     api->Log(ELogLevel_INFO, addon_name, event_name.c_str());
+    auto &chat_messages = settings_manager->get(&Settings::chat_messages);
     auto global_messages = chat_messages[0];
     auto current_messages = chat_messages[(int)mumble_link->Context.MapID];
 
@@ -236,6 +238,7 @@ void event_handler(void *data)
 {
     std::string event_name = reinterpret_cast<const char *>(data);
     api->Log(ELogLevel_DEBUG, addon_name, std::format("received event {}", event_name).c_str());
+    auto &chat_messages = settings_manager->get(&Settings::chat_messages);
 
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     for (auto &[map, messages] : chat_messages) {
@@ -257,7 +260,7 @@ std::string short_message;
 char message[199];
 bool squad_broadcast = false;
 int map_id = 0;
-static std::vector<std::pair<int, std::string>> visibility_options = {{
+static std::vector<std::pair<short, std::string>> visibility_options = {{
     {0, "Always"},
     {1, "During Gameplay"},
     {2, "Out of Combat"},
@@ -266,21 +269,20 @@ static std::vector<std::pair<int, std::string>> visibility_options = {{
 }};
 void render_options()
 {
-    if (ImGui::Checkbox("Lock Position##ChatShortsLockPosition", &Settings::lock_position)) {
-        Settings::json_settings[Settings::LOCK_POSITION] = Settings::lock_position;
-        Settings::save(Settings::settings_path);
+    auto &chat_messages = settings_manager->get(&Settings::chat_messages);
+
+    auto &s = settings_manager->get();
+    if (ImGui::Checkbox("Lock Position##ChatShortsLockPosition", &s.lock_position)) {
+        settings_manager->save();
     }
-    if (ImGui::InputInt("Number of columns##ChatShortsNumberColumns", &Settings::number_columns)) {
-        Settings::json_settings[Settings::NUMBER_COLUMNS] = Settings::number_columns;
-        Settings::save(Settings::settings_path);
+    if (ImGui::InputInt("Number of columns##ChatShortsNumberColumns", &s.number_columns)) {
+        settings_manager->save();
     }
-    if (ImGui::BeginCombo("Visibility##ChatShortsVisibility",
-                          visibility_options[Settings::visibility].second.c_str())) {
+    if (ImGui::BeginCombo("Visibility##ChatShortsVisibility", visibility_options[s.visibility].second.c_str())) {
         for (const auto &[key, value] : visibility_options) {
-            if (ImGui::Selectable(value.c_str(), key == Settings::visibility)) {
-                Settings::visibility = key;
-                Settings::json_settings[Settings::VISIBILITY] = Settings::visibility;
-                Settings::save(Settings::settings_path);
+            if (ImGui::Selectable(value.c_str(), key == s.visibility)) {
+                s.visibility = key;
+                settings_manager->save();
             }
         }
         ImGui::EndCombo();
@@ -305,15 +307,13 @@ void render_options()
             memset(message, 0, 199);
             squad_broadcast = false;
             map_id = 0;
-            Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-            Settings::save(Settings::settings_path);
+            settings_manager->set(&Settings::chat_messages, chat_messages);
         }
     }
     render_messages();
     if (to_delete != std::pair{-1, -1}) {
         chat_messages[to_delete.first].erase(chat_messages[to_delete.first].begin() + to_delete.second);
-        Settings::json_settings[Settings::CHAT_MESSAGES] = chat_messages;
-        Settings::save(Settings::settings_path);
+        settings_manager->set(&Settings::chat_messages, chat_messages);
         to_delete = {-1, -1};
     }
 }

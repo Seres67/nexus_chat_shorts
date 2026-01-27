@@ -15,9 +15,14 @@ endif()
 
 include_directories(include)
 
+# load settings manager as a cmake project
+add_subdirectory(thirdparty/settings_manager)
+set_property(TARGET nexus_settings_manager PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+include_directories(thirdparty/settings_manager/include)
+
 # load imgui as a cmake project
 add_subdirectory(src/imgui)
 
-add_library(nexus_chat_shorts SHARED src/main.cpp src/globals.cpp src/gui.cpp src/settings.cpp src/clipboard.cpp)
+add_library(nexus_chat_shorts SHARED src/main.cpp src/globals.cpp src/gui.cpp src/settings.cpp src/clipboard.cpp src/Key.cpp src/Message.cpp)
 target_link_libraries(nexus_chat_shorts PRIVATE imgui wininet)
 set_property(TARGET nexus_chat_shorts PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

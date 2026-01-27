@@ -2,6 +2,7 @@
 #define GLOBALS_HPP
 
 #include <Key.hpp>
+#include <Message.hpp>
 #include <map>
 #include <mumble/Mumble.h>
 #include <nexus/Nexus.h>
@@ -24,20 +25,6 @@ extern char addon_name[];
 
 extern HWND game_handle;
 
-struct Message
-{
-    std::string short_message;
-    std::string message;
-    bool squad_broadcast;
-    Key key;
-};
-
-extern std::map<int, std::vector<Message>> chat_messages;
 extern std::map<int, std::string> maps;
-
-extern bool converted;
-
-void from_json(const nlohmann::json &j, Message &message);
-void to_json(nlohmann::json &j, const Message &message);
 
 #endif // GLOBALS_HPP
