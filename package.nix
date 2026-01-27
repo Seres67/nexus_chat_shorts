@@ -22,6 +22,6 @@ stdenv.mkDerivation {
   '';
 
   postFixup = ''
-    md5sum $out/lib/lib*.dll > $out/libnexus_speedometer.dll.md5
+    md5sum $out/lib/lib*.dll > $out/libnexus_chat_shorts.dll.md5
   '';
 }
