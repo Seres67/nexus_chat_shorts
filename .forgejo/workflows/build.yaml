@@ -1,0 +1,19 @@
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: null
+jobs:
+  build:
+    runs-on: nixos-amd64
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - run: nix build
+      - uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: nexus_chat_shorts
+          path: |
+            result/lib/*.dll
+            result/*.md5
