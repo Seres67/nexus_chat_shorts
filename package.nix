@@ -17,8 +17,11 @@ stdenv.mkDerivation {
   ];
 
   installPhase = ''
-    x86_64-w64-mingw32-strip ./*.dll
     mkdir -p $out/lib
     cp ./*.dll $out/lib
+  '';
+
+  postFixup = ''
+    md5sum $out/lib/lib*.dll > $out/libnexus_speedometer.dll.md5
   '';
 }
