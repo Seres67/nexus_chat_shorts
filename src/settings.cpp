@@ -31,6 +31,9 @@ void from_json(const nlohmann::json &j, Settings &settings)
     if (j.contains("chat_messages")) {
         j.at("chat_messages").get_to(settings.chat_messages);
     }
+    if (j.contains("delay")) {
+        j.at("delay").get_to(settings.delay);
+    }
 }
 
 void to_json(nlohmann::json &j, const Settings &settings)
@@ -40,5 +43,6 @@ void to_json(nlohmann::json &j, const Settings &settings)
         {"visibility", settings.visibility},
         {"number_columns", settings.number_columns},
         {"chat_messages", settings.chat_messages},
+        {"delay", settings.delay},
     };
 }

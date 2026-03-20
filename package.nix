@@ -5,7 +5,7 @@
 }:
 stdenv.mkDerivation {
   pname = "nexus_chat_shorts";
-  version = "0.3.1.0";
+  version = "0.4.0.0";
   src = ./.;
 
   nativeBuildInputs = [

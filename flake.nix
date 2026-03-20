@@ -1,5 +1,5 @@
 {
-  description = "A Nexus addon to track currencies.";
+  description = "A Nexus addon to store and copy/send recurring chat messages";
   inputs = {
     flake-utils = {
       url = "github:numtide/flake-utils";

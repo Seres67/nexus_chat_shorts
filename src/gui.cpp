@@ -1,3 +1,4 @@
+#include <chrono>
 #include <clipboard.hpp>
 #include <format>
 #include <globals.hpp>
@@ -124,7 +125,7 @@ void broadcast_message(const std::wstring &message)
             if (mumble_link->Context.IsTextboxFocused) {
                 SendMessage(game_handle, WM_KEYDOWN, VK_ESCAPE, get_l_param(VK_ESCAPE, true));
                 SendMessage(game_handle, WM_KEYUP, VK_ESCAPE, get_l_param(VK_ESCAPE, false));
-                std::this_thread::sleep_for(25ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
             }
 
             SendMessage(game_handle, WM_KEYDOWN, VK_SHIFT, get_l_param(VK_SHIFT, true));
@@ -138,11 +139,11 @@ void broadcast_message(const std::wstring &message)
             select_text[0].ki.wVk = VK_CONTROL;
             UINT u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
             assert(u_sent == ARRAYSIZE(select_text));
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
 
             SendMessage(game_handle, WM_KEYDOWN, 'V', get_l_param('V', true));
             SendMessage(game_handle, WM_KEYUP, 'V', get_l_param('V', false));
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
             ZeroMemory(select_text, sizeof(select_text));
             select_text[0].type = INPUT_KEYBOARD;
             select_text[0].ki.wVk = VK_CONTROL;
@@ -150,10 +151,10 @@ void broadcast_message(const std::wstring &message)
             u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
             assert(u_sent == ARRAYSIZE(select_text));
 
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
             SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
             SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
         })
         .detach();
 }
@@ -169,7 +170,7 @@ void send_message(const std::wstring &message)
             if (!mumble_link->Context.IsTextboxFocused) {
                 SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
                 SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                std::this_thread::sleep_for(25ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
             } else {
                 open_chat = true;
             }
@@ -179,25 +180,28 @@ void send_message(const std::wstring &message)
             select_text[0].ki.wVk = VK_CONTROL;
             UINT u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
             assert(u_sent == ARRAYSIZE(select_text));
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
 
             SendMessage(game_handle, WM_KEYDOWN, 'V', get_l_param('V', true));
             SendMessage(game_handle, WM_KEYUP, 'V', get_l_param('V', false));
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
+
             ZeroMemory(select_text, sizeof(select_text));
             select_text[0].type = INPUT_KEYBOARD;
             select_text[0].ki.wVk = VK_CONTROL;
             select_text[0].ki.dwFlags = KEYEVENTF_KEYUP;
             u_sent = SendInput(ARRAYSIZE(select_text), select_text, sizeof(INPUT));
             assert(u_sent == ARRAYSIZE(select_text));
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
 
-            std::this_thread::sleep_for(25ms);
             SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
             SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-            std::this_thread::sleep_for(25ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
+
             if (open_chat) {
                 SendMessage(game_handle, WM_KEYDOWN, VK_RETURN, get_l_param(VK_RETURN, true));
                 SendMessage(game_handle, WM_KEYUP, VK_RETURN, get_l_param(VK_RETURN, false));
-                std::this_thread::sleep_for(25ms);
+                std::this_thread::sleep_for(std::chrono::milliseconds(settings_manager->get(&Settings::delay)));
             }
         })
         .detach();
@@ -286,6 +290,11 @@ void render_options()
             }
         }
         ImGui::EndCombo();
+    }
+    ImGui::TextColored({1.f, 1.f, 0.f, 1.f},
+                       "This delay is between each individual action! This adds up to 3-5x the delay value.");
+    if (ImGui::InputInt("Delay between actions##ChatShortsDelay", &s.delay)) {
+        settings_manager->save();
     }
     if (ImGui::CollapsingHeader("Add Message##ChatShortsMessagesCollapse")) {
         ImGui::InputText("Short Name##ChatShortsShortNameInput", &short_message);

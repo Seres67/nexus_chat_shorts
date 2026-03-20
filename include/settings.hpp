@@ -12,6 +12,7 @@ struct Settings
     short visibility = 0;
     int number_columns = 2;
     std::map<int, std::vector<Message>> chat_messages;
+    int delay = 25;
 };
 
 // NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, lock_position, visibility, number_columns, chat_messages);
